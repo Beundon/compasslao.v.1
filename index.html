@@ -6,14 +6,13 @@
 <title>Compass — Offline Map Tools</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#0f1117">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<!-- Core lightweight CSS/JS loaded first for instant render -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
-<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-<script src="https://unpkg.com/@tmcw/togeojson@5.6.0/dist/togeojson.umd.js"></script>
-<script src="https://unpkg.com/jszip@3.10.1/dist/jszip.min.js"></script>
-<script src="https://unpkg.com/shpjs@4.0.4/dist/shp.js"></script>
-<script src="https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
-<script src="https://unpkg.com/@ngageoint/geopackage@4.2.3/dist/geopackage.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <style>
   :root {
@@ -24,14 +23,9 @@
     --safe-bottom: env(safe-area-inset-bottom, 0px);
   }
   * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
-  body { font-family:'Outfit',sans-serif; background:var(--bg); color:var(--fg); overflow:hidden; height:100vh; height:100dvh; }
+  body { font-family:'Outfit',sans-serif; background:var(--bg); color:var(--fg); overflow:hidden; height:100dvh; touch-action:none; }
 
-  /* Top Bar */
-  .topbar {
-    position:fixed; top:0; left:0; right:0; height:50px; z-index:1000;
-    background:var(--bg2); border-bottom:1px solid var(--border);
-    display:flex; align-items:center; padding:0 16px; gap:10px;
-  }
+  .topbar { position:fixed; top:0; left:0; right:0; height:50px; z-index:1000; background:var(--bg2); border-bottom:1px solid var(--border); display:flex; align-items:center; padding:0 16px; gap:10px; }
   .topbar .brand { display:flex; align-items:center; gap:8px; }
   .topbar .brand svg { width:28px; height:28px; }
   .topbar .brand h1 { font-size:1.1rem; font-weight:800; letter-spacing:1px; }
@@ -39,64 +33,32 @@
   .topbar .coords { margin-left:auto; font-family:'JetBrains Mono',monospace; font-size:0.7rem; color:var(--muted); display:none; }
   @media(min-width:768px) { .topbar .coords { display:block; } }
 
-  /* Map */
-  #map { position:fixed; top:50px; left:0; right:0; bottom:60px; z-index:1; }
-  .leaflet-control-zoom { display:none; } /* Use pinch/drag on mobile */
+  #map { position:fixed; top:50px; left:0; right:0; bottom:60px; z-index:1; background:var(--bg); }
+  .leaflet-control-zoom { display:none; }
 
-  /* Bottom Navigation */
-  .bottom-nav {
-    position:fixed; bottom:0; left:0; right:0; height:60px; z-index:1000;
-    background:var(--bg2); border-top:1px solid var(--border);
-    display:flex; align-items:center; justify-content:space-around; padding-bottom:var(--safe-bottom);
-  }
-  .nav-btn {
-    display:flex; flex-direction:column; align-items:center; justify-content:center;
-    background:none; border:none; color:var(--muted); cursor:pointer; padding:8px 12px;
-    font-family:'Outfit',sans-serif; font-size:0.65rem; font-weight:600; gap:4px; transition:0.2s;
-  }
+  .bottom-nav { position:fixed; bottom:0; left:0; right:0; height:60px; z-index:1000; background:var(--bg2); border-top:1px solid var(--border); display:flex; align-items:center; justify-content:space-around; padding-bottom:var(--safe-bottom); }
+  .nav-btn { display:flex; flex-direction:column; align-items:center; justify-content:center; background:none; border:none; color:var(--muted); cursor:pointer; padding:8px 12px; font-family:'Outfit',sans-serif; font-size:0.65rem; font-weight:600; gap:4px; transition:0.2s; }
   .nav-btn i { font-size:1.2rem; }
   .nav-btn.active { color:var(--accent); }
   .nav-btn.locate-btn i { font-size:1.5rem; color:var(--locate); }
   
-  /* Floating Action Button (Save) */
-  .fab {
-    position:fixed; bottom:80px; right:16px; z-index:900; width:56px; height:56px;
-    border-radius:50%; background:var(--accent); color:var(--bg); border:none;
-    font-size:1.4rem; cursor:pointer; box-shadow:0 4px 12px rgba(0,0,0,0.4);
-    display:none; align-items:center; justify-content:center; transition:0.2s;
-  }
+  .fab { position:fixed; bottom:80px; right:16px; z-index:900; width:56px; height:56px; border-radius:50%; background:var(--accent); color:var(--bg); border:none; font-size:1.4rem; cursor:pointer; box-shadow:0 4px 12px rgba(0,0,0,0.4); display:none; align-items:center; justify-content:center; transition:0.2s; }
   .fab:active { transform:scale(0.9); }
 
-  /* Left Drawer (Menu / Layers / Import/Export) */
   .drawer-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:1500; display:none; }
   .drawer-overlay.open { display:block; }
-  .drawer {
-    position:fixed; top:0; left:0; bottom:0; width:300px; z-index:1600;
-    background:var(--bg2); transform:translateX(-100%); transition:transform 0.3s ease;
-    display:flex; flex-direction:column;
-  }
+  .drawer { position:fixed; top:0; left:0; bottom:0; width:300px; z-index:1600; background:var(--bg2); transform:translateX(-100%); transition:transform 0.3s ease; display:flex; flex-direction:column; }
   .drawer.open { transform:translateX(0); }
   .drawer-header { padding:20px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; }
   .drawer-header h2 { font-size:1.2rem; font-weight:700; }
   .drawer-body { flex:1; overflow-y:auto; padding:12px; }
-  .drawer-btn {
-    width:100%; padding:14px; background:var(--card); border:1px solid var(--border);
-    color:var(--fg); border-radius:12px; margin-bottom:8px; cursor:pointer;
-    font-family:'Outfit',sans-serif; font-size:0.9rem; font-weight:600;
-    display:flex; align-items:center; gap:12px; text-align:left; transition:0.2s;
-  }
+  .drawer-btn { width:100%; padding:14px; background:var(--card); border:1px solid var(--border); color:var(--fg); border-radius:12px; margin-bottom:8px; cursor:pointer; font-family:'Outfit',sans-serif; font-size:0.9rem; font-weight:600; display:flex; align-items:center; gap:12px; text-align:left; transition:0.2s; }
   .drawer-btn i { width:20px; text-align:center; color:var(--accent); }
   .drawer-btn:active { background:var(--card2); transform:scale(0.98); }
 
-  /* Bottom Sheet (Saved Items) */
   .bottom-sheet-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:1500; display:none; }
   .bottom-sheet-overlay.open { display:block; }
-  .bottom-sheet {
-    position:fixed; bottom:0; left:0; right:0; top:15vh; z-index:1600;
-    background:var(--bg2); border-radius:20px 20px 0 0;
-    transform:translateY(100%); transition:transform 0.3s ease;
-    display:flex; flex-direction:column;
-  }
+  .bottom-sheet { position:fixed; bottom:0; left:0; right:0; top:15vh; z-index:1600; background:var(--bg2); border-radius:20px 20px 0 0; transform:translateY(100%); transition:transform 0.3s ease; display:flex; flex-direction:column; }
   .bottom-sheet.open { transform:translateY(0); }
   .sheet-handle { width:40px; height:4px; background:var(--muted); border-radius:2px; margin:12px auto; }
   .sheet-header { padding:0 20px 16px; display:flex; justify-content:space-between; align-items:center; }
@@ -116,19 +78,17 @@
   .saved-item .item-icon.import { background:rgba(168,85,247,0.15); color:#a855f7; }
   .saved-item .item-name { font-weight:600; font-size:0.9rem; flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .saved-item .item-desc { font-size:0.78rem; color:var(--muted); margin-bottom:6px; line-height:1.3; }
-  .saved-item .item-meta { font-family:'JetBrains Mono',monospace; font-size:0.7rem; color:var(--muted); display:flex; gap:12px; flex-wrap:wrap; }
+  .saved-item .item-meta { font-family:'JetBrains Mono',monospace; font-size:0.7rem; color:var(--muted); display:flex; gap:12px; }
   .saved-item .item-actions { display:flex; gap:4px; margin-left:auto; }
   .saved-item .item-actions button { width:30px; height:30px; border-radius:8px; border:none; background:var(--card2); color:var(--muted); cursor:pointer; font-size:0.7rem; display:flex; align-items:center; justify-content:center; }
   .saved-item .item-actions button.del { color:var(--danger); }
 
-  /* Modal */
   .modal-overlay { position:fixed; inset:0; z-index:2000; background:rgba(0,0,0,0.6); display:none; align-items:flex-end; justify-content:center; }
   .modal-overlay.show { display:flex; }
   .modal { background:var(--bg2); border-radius:20px 20px 0 0; width:100%; max-width:500px; padding:0; animation: modalIn 0.3s ease; max-height:90vh; overflow-y:auto; padding-bottom:var(--safe-bottom); }
   @keyframes modalIn { from{transform:translateY(100%)} to{transform:translateY(0)} }
   .modal .modal-top { padding:20px 24px 12px; }
   .modal .modal-top h3 { font-size:1.1rem; font-weight:700; margin-bottom:4px; }
-  .modal .modal-top p { font-size:0.8rem; color:var(--muted); }
   .modal .modal-body { padding:12px 24px; }
   .modal .field { margin-bottom:14px; }
   .modal .field label { display:block; font-size:0.8rem; font-weight:600; margin-bottom:6px; color:var(--muted); }
@@ -141,7 +101,6 @@
   .modal .btn-cancel { background:var(--card); color:var(--muted); }
   .modal .btn-save { background:var(--accent); color:var(--bg); }
 
-  /* Status & Toast */
   .statusbar { position:fixed; top:50px; left:0; right:0; height:24px; z-index:900; background:rgba(15,17,23,0.8); display:flex; align-items:center; padding:0 12px; font-family:'JetBrains Mono',monospace; font-size:0.65rem; color:var(--muted); backdrop-filter:blur(4px); }
   .statusbar .active-tool { color:var(--accent); font-weight:500; margin-left:8px; }
   .toast-container { position:fixed; top:80px; left:50%; transform:translateX(-50%); z-index:3000; width:90%; max-width:400px; display:flex; flex-direction:column; gap:8px; }
@@ -149,7 +108,6 @@
   @keyframes toastIn { from{opacity:0;transform:translateY(-20px)} } @keyframes toastOut { to{opacity:0;transform:translateY(-20px)} }
   .toast.success i { color:var(--success); } .toast.info i { color:var(--info); } .toast.warn i { color:var(--accent); }
 
-  /* Pulse for Location */
   @keyframes pulse { 0%{box-shadow:0 0 0 0 rgba(59,130,246,0.5)} 70%{box-shadow:0 0 0 15px rgba(59,130,246,0)} 100%{box-shadow:0 0 0 0 rgba(59,130,246,0)} }
   .location-pulse { animation: pulse 2s infinite; background:var(--locate); border:3px solid #fff; border-radius:50%; width:16px; height:16px; position:relative; left:-4px; top:-4px; }
   
@@ -239,200 +197,76 @@
 <!-- Toast -->
 <div class="toast-container" id="toastContainer"></div>
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
-
+  // ==================== STATE ====================
   let currentTool = null, map, locationMarker = null, locationCircle = null, isLocating = false;
   let tempPoints = [], tempMarkers = [], tempPolyline = null, tempPolygon = null;
   let trackPoints = [], trackPolyline = null, trackMarker = null, isRecordingTrack = false, watchId = null;
   let savedItems = [], savedLayers = {}, currentFilter = 'all', pendingSaveData = null;
 
+  // ==================== DYNAMIC LIBRARY LOADER ====================
+  const LIBS = {
+    togeojson: 'https://unpkg.com/@tmcw/togeojson@5.6.0/dist/togeojson.umd.js',
+    jszip: 'https://unpkg.com/jszip@3.10.1/dist/jszip.min.js',
+    shp: 'https://unpkg.com/shpjs@4.0.4/dist/shp.js',
+    pdfjs: 'https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.min.js',
+    geopackage: 'https://unpkg.com/@ngageoint/geopackage@4.2.3/dist/geopackage.min.js'
+  };
+  const loadedLibs = {};
+  function loadScript(src) { return new Promise((resolve, reject) => { if (loadedLibs[src]) return resolve(); const s = document.createElement('script'); s.src = src; s.onload = () => { loadedLibs[src] = true; resolve(); }; s.onerror = reject; document.head.appendChild(s); }); }
+  async function ensureLibs(...names) { const promises = names.map(name => loadScript(LIBS[name])); await Promise.all(promises); if (names.includes('pdfjs') && window.pdfjsLib) { pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.worker.min.js'; } }
+
   // ==================== MAP INIT ====================
-  map = L.map('map', { center: [13.7563, 100.5018], zoom: 13, zoomControl: false }).addTo(document.getElementById('map'));
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { maxZoom: 19 }).addTo(map);
+  // FIXED: Removed invalid .addTo() on map instance, fixed tile loading params
+  map = L.map('map', { 
+    center: [13.7563, 100.5018], 
+    zoom: 13, 
+    zoomControl: false,
+    updateWhenIdle: false // Forces tiles to load while dragging/panning for mobile smoothness
+  });
+  
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    attribution: '© OSM © CARTO',
+    subdomains: 'abcd',
+    maxZoom: 19,
+    updateWhenIdle: false
+  }).addTo(map);
+
+  // Force Leaflet to recalculate map size (fixes blank map on mobile browsers)
+  setTimeout(() => { map.invalidateSize(); }, 200);
 
   map.on('mousemove move', e => { document.getElementById('coordsDisplay').textContent = `${e.latlng.lat.toFixed(5)}, ${e.latlng.lng.toFixed(5)}`; });
   map.on('click', e => { if(!currentTool) return; if(currentTool==='point') handlePointClick(e.latlng); else if(currentTool==='distance') handleDistanceClick(e.latlng); else if(currentTool==='area') handleAreaClick(e.latlng); });
   map.on('dblclick', e => { if(currentTool==='track' && isRecordingTrack) addTrackPoint({lat:e.latlng.lat, lng:e.latlng.lng}); });
 
   // ==================== LOCAL STORAGE ====================
-  function persistData() {
-    try {
-      const serializable = savedItems.map(item => {
-        const copy = {...item, data: {...item.data}};
-        if (copy.data.layer) delete copy.data.layer; // Cannot serialize Leaflet layer
-        return copy;
-      });
-      localStorage.setItem('compassData', JSON.stringify(serializable));
-    } catch (e) { console.error("LocalStorage full", e); showToast("Storage full. Delete some items.", "warn"); }
-  }
-
-  function loadData() {
-    const data = localStorage.getItem('compassData');
-    if (data) {
-      try {
-        savedItems = JSON.parse(data);
-        savedItems.forEach(item => createSavedLayer(item));
-      } catch(e) { console.error("Failed to parse local data"); }
-    }
-  }
+  function persistData() { try { const s = savedItems.map(i => { const c = {...i, data: {...i.data}}; if (c.data.layer) delete c.data.layer; return c; }); localStorage.setItem('compassData', JSON.stringify(s)); } catch (e) { showToast("Storage full", "warn"); } }
+  function loadData() { const data = localStorage.getItem('compassData'); if (data) { try { savedItems = JSON.parse(data); setTimeout(() => { savedItems.forEach(item => createSavedLayer(item)); }, 50); } catch(e) {} } }
 
   // ==================== LOCATE ME ====================
-  function toggleLocate() {
-    if (isLocating) { stopLocate(); } else { startLocate(); }
-  }
-
-  function startLocate() {
-    isLocating = true;
-    document.querySelector('.locate-btn').classList.add('active');
-    document.getElementById('statusInfo').textContent = 'Getting GPS location...';
-    map.locate({setView: true, maxZoom: 16, watch: true, enableHighAccuracy: true});
-  }
-
-  function stopLocate() {
-    isLocating = false;
-    document.querySelector('.locate-btn').classList.remove('active');
-    map.stopLocate();
-    if (locationMarker) { map.removeLayer(locationMarker); locationMarker = null; }
-    if (locationCircle) { map.removeLayer(locationCircle); locationCircle = null; }
-    document.getElementById('statusInfo').textContent = 'Ready';
-  }
-
-  map.on('locationfound', function(e) {
-    if (!locationMarker) {
-      locationMarker = L.marker(e.latlng, { icon: L.divIcon({ className: '', html: '<div class="location-pulse"></div>', iconSize: [16,16] }) }).addTo(map);
-      locationCircle = L.circle(e.latlng, { radius: e.accuracy/2, color: '#3b82f6', fillColor: '#3b82f6', fillOpacity: 0.1, weight: 1 }).addTo(map);
-    } else {
-      locationMarker.setLatLng(e.latlng);
-      locationCircle.setLatLng(e.latlng).setRadius(e.accuracy/2);
-    }
-    document.getElementById('statusInfo').textContent = `GPS Acc: ${Math.round(e.accuracy)}m`;
-  });
-
+  function toggleLocate() { isLocating ? stopLocate() : startLocate(); }
+  function startLocate() { isLocating = true; document.querySelector('.locate-btn').classList.add('active'); document.getElementById('statusInfo').textContent = 'Getting GPS...'; map.locate({setView: true, maxZoom: 16, watch: true, enableHighAccuracy: true}); }
+  function stopLocate() { isLocating = false; document.querySelector('.locate-btn').classList.remove('active'); map.stopLocate(); if (locationMarker) { map.removeLayer(locationMarker); locationMarker = null; } if (locationCircle) { map.removeLayer(locationCircle); locationCircle = null; } document.getElementById('statusInfo').textContent = 'Ready'; }
+  map.on('locationfound', function(e) { if (!locationMarker) { locationMarker = L.marker(e.latlng, { icon: L.divIcon({ className: '', html: '<div class="location-pulse"></div>', iconSize: [16,16] }) }).addTo(map); locationCircle = L.circle(e.latlng, { radius: e.accuracy/2, color: '#3b82f6', fillColor: '#3b82f6', fillOpacity: 0.1, weight: 1 }).addTo(map); } else { locationMarker.setLatLng(e.latlng); locationCircle.setLatLng(e.latlng).setRadius(e.accuracy/2); } document.getElementById('statusInfo').textContent = `GPS Acc: ${Math.round(e.accuracy)}m`; });
   map.on('locationerror', function(e) { showToast("GPS Error: " + e.message, "warn"); stopLocate(); });
 
   // ==================== TOOLS ====================
-  function setTool(tool) {
-    if (currentTool === tool) { deactivateTool(); return; }
-    if (currentTool) deactivateTool();
-    currentTool = tool;
-    document.querySelectorAll('.nav-btn[data-tool]').forEach(b => b.classList.remove('active'));
-    const btn = document.querySelector(`.nav-btn[data-tool="${tool}"]`);
-    if (btn) btn.classList.add('active');
-    document.getElementById('activeToolLabel').textContent = tool.toUpperCase();
-    if (tool === 'track') startTrackRecording();
-    else document.getElementById('statusInfo').textContent = `Tap map for ${tool}`;
-  }
-
-  function deactivateTool() {
-    if (currentTool === 'track' && isRecordingTrack) stopTrackRecording();
-    currentTool = null;
-    document.querySelectorAll('.nav-btn[data-tool]').forEach(b => b.classList.remove('active'));
-    document.getElementById('activeToolLabel').textContent = '';
-    document.getElementById('statusInfo').textContent = 'Ready';
-  }
-
-  function handlePointClick(latlng) {
-    pendingSaveData = { type: 'point', latlng: { lat: latlng.lat, lng: latlng.lng }, summary: `Location: ${latlng.lat.toFixed(6)}, ${latlng.lng.toFixed(6)}` };
-    openSaveModal('Save Point', 'Name this location', pendingSaveData.summary);
-  }
-
-  function handleDistanceClick(latlng) {
-    tempPoints.push({ lat: latlng.lat, lng: latlng.lng });
-    tempMarkers.push(L.circleMarker(latlng, { radius: 6, fillColor: '#38bdf8', fillOpacity: 0.9, color: '#fff', weight: 2 }).addTo(map));
-    if (tempPolyline) map.removeLayer(tempPolyline);
-    if (tempPoints.length > 1) tempPolyline = L.polyline(tempPoints.map(p => [p.lat, p.lng]), { color: '#38bdf8', weight: 3, dashArray: '8 6' }).addTo(map);
-    document.getElementById('statusInfo').textContent = `Dist: ${calcTotalDistance(tempPoints).toFixed(2)} km`;
-  }
-
-  function handleAreaClick(latlng) {
-    tempPoints.push({ lat: latlng.lat, lng: latlng.lng });
-    tempMarkers.push(L.circleMarker(latlng, { radius: 6, fillColor: '#f0a500', fillOpacity: 0.9, color: '#fff', weight: 2 }).addTo(map));
-    if (tempPolygon) map.removeLayer(tempPolygon);
-    if (tempPolyline) map.removeLayer(tempPolyline);
-    if (tempPoints.length >= 3) tempPolygon = L.polygon(tempPoints.map(p => [p.lat, p.lng]), { color: '#f0a500', weight: 2, fillColor: '#f0a500', fillOpacity: 0.15 }).addTo(map);
-    if (tempPoints.length > 1) tempPolyline = L.polyline(tempPoints.map(p => [p.lat, p.lng]), { color: '#f0a500', weight: 2, dashArray: '6 4' }).addTo(map);
-    if (tempPoints.length >= 3) document.getElementById('statusInfo').textContent = `Area: ${formatArea(calcPolygonArea(tempPoints))}`;
-  }
-
-  function startTrackRecording() {
-    isRecordingTrack = true; trackPoints = [];
-    showToast('Track recording... DblClick map to add', 'info');
-    if (navigator.geolocation) {
-      watchId = navigator.geolocation.watchPosition(pos => addTrackPoint({lat:pos.coords.latitude, lng:pos.coords.longitude}), e=>{}, {enableHighAccuracy:true});
-    }
-  }
-
-  function addTrackPoint(pt) {
-    trackPoints.push(pt);
-    if (trackPolyline) map.removeLayer(trackPolyline);
-    trackPolyline = L.polyline(trackPoints.map(p => [p.lat, p.lng]), { color: '#ff6b35', weight: 4 }).addTo(map);
-    document.getElementById('statusInfo').textContent = `Track: ${calcTotalDistance(trackPoints).toFixed(2)} km`;
-  }
-
-  function stopTrackRecording() {
-    isRecordingTrack = false;
-    if (watchId !== null) { navigator.geolocation.clearWatch(watchId); watchId = null; }
-    if (trackPoints.length >= 2) {
-      pendingSaveData = { type: 'track', points: [...trackPoints], summary: `Distance: ${calcTotalDistance(trackPoints).toFixed(2)} km` };
-      openSaveModal('Save Track', 'Name this track', pendingSaveData.summary);
-    } else { clearTemp(); }
-  }
+  function setTool(tool) { if (currentTool === tool) { deactivateTool(); return; } if (currentTool) deactivateTool(); currentTool = tool; document.querySelectorAll('.nav-btn[data-tool]').forEach(b => b.classList.remove('active')); const btn = document.querySelector(`.nav-btn[data-tool="${tool}"]`); if (btn) btn.classList.add('active'); document.getElementById('activeToolLabel').textContent = tool.toUpperCase(); if (tool === 'track') startTrackRecording(); else document.getElementById('statusInfo').textContent = `Tap map for ${tool}`; }
+  function deactivateTool() { if (currentTool === 'track' && isRecordingTrack) stopTrackRecording(); currentTool = null; document.querySelectorAll('.nav-btn[data-tool]').forEach(b => b.classList.remove('active')); document.getElementById('activeToolLabel').textContent = ''; document.getElementById('statusInfo').textContent = 'Ready'; }
+  
+  function handlePointClick(latlng) { pendingSaveData = { type: 'point', latlng: { lat: latlng.lat, lng: latlng.lng }, summary: `Location: ${latlng.lat.toFixed(6)}, ${latlng.lng.toFixed(6)}` }; openSaveModal('Save Point', 'Name this location', pendingSaveData.summary); }
+  function handleDistanceClick(latlng) { tempPoints.push({ lat: latlng.lat, lng: latlng.lng }); tempMarkers.push(L.circleMarker(latlng, { radius: 6, fillColor: '#38bdf8', fillOpacity: 0.9, color: '#fff', weight: 2 }).addTo(map)); if (tempPolyline) map.removeLayer(tempPolyline); if (tempPoints.length > 1) tempPolyline = L.polyline(tempPoints.map(p => [p.lat, p.lng]), { color: '#38bdf8', weight: 3, dashArray: '8 6' }).addTo(map); document.getElementById('statusInfo').textContent = `Dist: ${calcTotalDistance(tempPoints).toFixed(2)} km`; }
+  function handleAreaClick(latlng) { tempPoints.push({ lat: latlng.lat, lng: latlng.lng }); tempMarkers.push(L.circleMarker(latlng, { radius: 6, fillColor: '#f0a500', fillOpacity: 0.9, color: '#fff', weight: 2 }).addTo(map)); if (tempPolygon) map.removeLayer(tempPolygon); if (tempPolyline) map.removeLayer(tempPolyline); if (tempPoints.length >= 3) tempPolygon = L.polygon(tempPoints.map(p => [p.lat, p.lng]), { color: '#f0a500', weight: 2, fillColor: '#f0a500', fillOpacity: 0.15 }).addTo(map); if (tempPoints.length > 1) tempPolyline = L.polyline(tempPoints.map(p => [p.lat, p.lng]), { color: '#f0a500', weight: 2, dashArray: '6 4' }).addTo(map); if (tempPoints.length >= 3) document.getElementById('statusInfo').textContent = `Area: ${formatArea(calcPolygonArea(tempPoints))}`; }
+  function startTrackRecording() { isRecordingTrack = true; trackPoints = []; showToast('Track recording... DblClick map to add', 'info'); if (navigator.geolocation) { watchId = navigator.geolocation.watchPosition(pos => addTrackPoint({lat:pos.coords.latitude, lng:pos.coords.longitude}), e=>{}, {enableHighAccuracy:true}); } }
+  function addTrackPoint(pt) { trackPoints.push(pt); if (trackPolyline) map.removeLayer(trackPolyline); trackPolyline = L.polyline(trackPoints.map(p => [p.lat, p.lng]), { color: '#ff6b35', weight: 4 }).addTo(map); document.getElementById('statusInfo').textContent = `Track: ${calcTotalDistance(trackPoints).toFixed(2)} km`; }
+  function stopTrackRecording() { isRecordingTrack = false; if (watchId !== null) { navigator.geolocation.clearWatch(watchId); watchId = null; } if (trackPoints.length >= 2) { pendingSaveData = { type: 'track', points: [...trackPoints], summary: `Distance: ${calcTotalDistance(trackPoints).toFixed(2)} km` }; openSaveModal('Save Track', 'Name this track', pendingSaveData.summary); } else { clearTemp(); } }
 
   // ==================== SAVE LOGIC ====================
-  function openSaveModal(title, subtitle, preview) {
-    document.getElementById('modalTitle').textContent = title;
-    document.getElementById('modalSubtitle').textContent = subtitle;
-    document.getElementById('itemPreview').textContent = preview || '—';
-    document.getElementById('itemName').value = '';
-    document.getElementById('itemDesc').value = '';
-    document.getElementById('saveModal').classList.add('show');
-    setTimeout(() => document.getElementById('itemName').focus(), 100);
-  }
-
+  function openSaveModal(title, subtitle, preview) { document.getElementById('modalTitle').textContent = title; document.getElementById('modalSubtitle').textContent = subtitle; document.getElementById('itemPreview').textContent = preview || '—'; document.getElementById('itemName').value = ''; document.getElementById('itemDesc').value = ''; document.getElementById('saveModal').classList.add('show'); setTimeout(() => document.getElementById('itemName').focus(), 100); }
   function closeSaveModal() { document.getElementById('saveModal').classList.remove('show'); pendingSaveData = null; }
-
-  function confirmSave() {
-    const name = document.getElementById('itemName').value.trim();
-    if (!name) { showToast('Name is required', 'warn'); return; }
-    const desc = document.getElementById('itemDesc').value.trim();
-    const data = pendingSaveData;
-    if (!data) { closeSaveModal(); return; }
-
-    if (data.isEdit) {
-      const item = savedItems.find(i => String(i.id) === String(data.editId));
-      if (item) { item.name = name; item.desc = desc; persistData(); renderSheet(); showToast("Updated", "success"); }
-      closeSaveModal(); return;
-    }
-
-    const item = { id: Date.now(), type: data.type, name, desc, createdAt: new Date().toLocaleString(), data };
-    savedItems.push(item);
-    createSavedLayer(item);
-    clearTemp(); closeSaveModal(); persistData(); renderSheet();
-    showToast(`"${name}" saved`, 'success'); deactivateTool();
-  }
-
-  function createSavedLayer(item) {
-    let layer; const d = item.data;
-    if (d.type === 'point') {
-      const icon = L.divIcon({ className:'', html:`<div style="background:var(--success);width:24px;height:24px;border-radius:50%;border:2px solid #fff;display:flex;align-items:center;justify-content:center"><i class="fas fa-map-pin" style="color:#fff;font-size:10px"></i></div>`, iconSize:[24,24], iconAnchor:[12,12] });
-      layer = L.marker([d.latlng.lat, d.latlng.lng], {icon}).bindPopup(`<b>${item.name}</b>${item.desc?'<br>'+item.desc:''}`);
-    } else if (d.type === 'distance') {
-      layer = L.layerGroup([L.polyline(d.points.map(p=>[p.lat,p.lng]), {color:'#38bdf8',weight:3}), ...d.points.map(p=>L.circleMarker(p,{radius:4,fillColor:'#38bdf8',color:'#fff',weight:1}))]);
-    } else if (d.type === 'area') {
-      layer = L.layerGroup([L.polygon(d.points.map(p=>[p.lat,p.lng]), {color:'#f0a500',weight:2,fillColor:'#f0a500',fillOpacity:0.1}), ...d.points.map(p=>L.circleMarker(p,{radius:4,fillColor:'#f0a500',color:'#fff',weight:1}))]);
-    } else if (d.type === 'track') {
-      layer = L.polyline(d.points.map(p=>[p.lat,p.lng]), {color:'#ff6b35',weight:4});
-    } else if (d.type === 'import') {
-      if (d.subType === 'pdf') {
-        layer = L.imageOverlay(d.imgDataUrl, d.bounds, {opacity:0.7});
-      } else if (d.geojson) {
-        layer = L.geoJSON(d.geojson, { style: {color:'#a855f7',weight:2,fillColor:'#a855f7',fillOpacity:0.15}, pointToLayer: (f,ll) => L.circleMarker(ll,{radius:5,fillColor:'#a855f7',color:'#fff',weight:1}) });
-      }
-    }
-    if(layer) { savedLayers[item.id] = layer.addTo(map); }
-  }
+  function confirmSave() { const name = document.getElementById('itemName').value.trim(); if (!name) { showToast('Name is required', 'warn'); return; } const desc = document.getElementById('itemDesc').value.trim(); const data = pendingSaveData; if (!data) { closeSaveModal(); return; } if (data.isEdit) { const item = savedItems.find(i => String(i.id) === String(data.editId)); if (item) { item.name = name; item.desc = desc; persistData(); renderSheet(); showToast("Updated", "success"); } closeSaveModal(); return; } const item = { id: Date.now(), type: data.type, name, desc, createdAt: new Date().toLocaleString(), data }; savedItems.push(item); createSavedLayer(item); clearTemp(); closeSaveModal(); persistData(); renderSheet(); showToast(`"${name}" saved`, 'success'); deactivateTool(); }
+  
+  function createSavedLayer(item) { let layer; const d = item.data; if (d.type === 'point') { const icon = L.divIcon({ className:'', html:`<div style="background:var(--success);width:24px;height:24px;border-radius:50%;border:2px solid #fff;display:flex;align-items:center;justify-content:center"><i class="fas fa-map-pin" style="color:#fff;font-size:10px"></i></div>`, iconSize:[24,24], iconAnchor:[12,12] }); layer = L.marker([d.latlng.lat, d.latlng.lng], {icon}).bindPopup(`<b>${item.name}</b>${item.desc?'<br>'+item.desc:''}`); } else if (d.type === 'distance') { layer = L.layerGroup([L.polyline(d.points.map(p=>[p.lat,p.lng]), {color:'#38bdf8',weight:3}), ...d.points.map(p=>L.circleMarker(p,{radius:4,fillColor:'#38bdf8',color:'#fff',weight:1}))]); } else if (d.type === 'area') { layer = L.layerGroup([L.polygon(d.points.map(p=>[p.lat,p.lng]), {color:'#f0a500',weight:2,fillColor:'#f0a500',fillOpacity:0.1}), ...d.points.map(p=>L.circleMarker(p,{radius:4,fillColor:'#f0a500',color:'#fff',weight:1}))]); } else if (d.type === 'track') { layer = L.polyline(d.points.map(p=>[p.lat,p.lng]), {color:'#ff6b35',weight:4}); } else if (d.type === 'import') { if (d.subType === 'pdf') { layer = L.imageOverlay(d.imgDataUrl, d.bounds, {opacity:0.7}); } else if (d.geojson) { layer = L.geoJSON(d.geojson, { style: {color:'#a855f7',weight:2,fillColor:'#a855f7',fillOpacity:0.15}, pointToLayer: (f,ll) => L.circleMarker(ll,{radius:5,fillColor:'#a855f7',color:'#fff',weight:1}) }); } } if(layer) { savedLayers[item.id] = layer.addTo(map); } }
 
   // ==================== CLEAR / CALC ====================
   function clearTemp() { tempMarkers.forEach(m=>map.removeLayer(m)); tempMarkers=[]; if(tempPolyline){map.removeLayer(tempPolyline);tempPolyline=null;} if(tempPolygon){map.removeLayer(tempPolygon);tempPolygon=null;} tempPoints=[]; if(trackPolyline){map.removeLayer(trackPolyline);trackPolyline=null;} trackPoints=[]; document.getElementById('fabSave').style.display='none'; }
@@ -441,94 +275,34 @@
   function calcTotalDistance(p){let d=0;for(let i=1;i<p.length;i++)d+=haversine(p[i-1].lat,p[i-1].lng,p[i].lat,p[i].lng);return d;}
   function calcPolygonArea(p){if(p.length<3)return 0;const l=p[0].lat*Math.PI/180,R=6371000,mL=R*Math.PI/180,mN=R*Math.cos(l)*Math.PI/180;let a=0;for(let i=0;i<p.length;i++){const j=(i+1)%p.length;a+=(p[i].lng*mN)*(p[j].lat*mL)-(p[j].lng*mN)*(p[i].lat*mL);}return Math.abs(a/2);}
   function formatArea(s){if(s>=1e6)return(s/1e6).toFixed(2)+' km²';if(s>=1e4)return(s/1e4).toFixed(2)+' ha';return s.toFixed(0)+' m²';}
-  
-  function triggerSaveCurrentWork() {
-    if(currentTool==='distance'&&tempPoints.length>=2){pendingSaveData={type:'distance',points:[...tempPoints],distance:calcTotalDistance(tempPoints),summary:`Dist: ${calcTotalDistance(tempPoints).toFixed(2)} km`};openSaveModal('Save Distance','',pendingSaveData.summary);}
-    else if(currentTool==='area'&&tempPoints.length>=3){const a=calcPolygonArea(tempPoints);pendingSaveData={type:'area',points:[...tempPoints],area:a,summary:`Area: ${formatArea(a)}`};openSaveModal('Save Area','',pendingSaveData.summary);}
-    else if(currentTool==='track'&&isRecordingTrack&&trackPoints.length>=2){stopTrackRecording();}
-  }
-
+  function triggerSaveCurrentWork() { if(currentTool==='distance'&&tempPoints.length>=2){pendingSaveData={type:'distance',points:[...tempPoints],distance:calcTotalDistance(tempPoints),summary:`Dist: ${calcTotalDistance(tempPoints).toFixed(2)} km`};openSaveModal('Save Distance','',pendingSaveData.summary);} else if(currentTool==='area'&&tempPoints.length>=3){const a=calcPolygonArea(tempPoints);pendingSaveData={type:'area',points:[...tempPoints],area:a,summary:`Area: ${formatArea(a)}`};openSaveModal('Save Area','',pendingSaveData.summary);} else if(currentTool==='track'&&isRecordingTrack&&trackPoints.length>=2){stopTrackRecording();} }
   setInterval(() => { const s=(currentTool==='distance'&&tempPoints.length>=2)||(currentTool==='area'&&tempPoints.length>=3)||(currentTool==='track'&&isRecordingTrack&&trackPoints.length>=2); document.getElementById('fabSave').style.display=s?'flex':'none'; }, 300);
 
   // ==================== FILE IMPORT ====================
-  async function processFileUpload(event) {
-    const files = event.target.files; if(!files.length) return;
-    for (const file of files) {
-      const ext = file.name.split('.').pop().toLowerCase();
-      try {
-        if(ext==='kml') await parseKML(file); else if(ext==='kmz') await parseKMZ(file);
-        else if(ext==='gpx') await parseGPX(file); else if(ext==='zip') await parseSHP(file);
-        else if(ext==='geojson'||ext==='json') await parseGeoJSON(file);
-        else if(ext==='gpkg') await parseGPKG(file); else if(ext==='pdf') await parsePDF(file);
-        else showToast(`Unsupported: .${ext}`, 'warn');
-      } catch(e) { console.error(e); showToast(`Error: ${file.name}`, 'warn'); }
-    }
-    event.target.value = '';
-  }
-
+  async function processFileUpload(event) { const files = event.target.files; if(!files.length) return; showToast('Processing file...', 'info'); for (const file of files) { const ext = file.name.split('.').pop().toLowerCase(); try { if(ext==='kml') { await ensureLibs('togeojson'); await parseKML(file); } else if(ext==='kmz') { await ensureLibs('jszip','togeojson'); await parseKMZ(file); } else if(ext==='gpx') { await ensureLibs('togeojson'); await parseGPX(file); } else if(ext==='zip') { await ensureLibs('shp'); await parseSHP(file); } else if(ext==='geojson'||ext==='json') { await parseGeoJSON(file); } else if(ext==='gpkg') { await ensureLibs('geopackage'); await parseGPKG(file); } else if(ext==='pdf') { await ensureLibs('pdfjs'); await parsePDF(file); } else showToast(`Unsupported: .${ext}`, 'warn'); } catch(e) { console.error(e); showToast(`Error: ${file.name}`, 'warn'); } } event.target.value = ''; }
   async function parseGeoJSON(f) { const t=await f.text(); addImportedLayer(JSON.parse(t), f.name); }
   async function parseKML(f) { const t=await f.text(); addImportedLayer(toGeoJSON.kml(new DOMParser().parseFromString(t,'text/xml')), f.name); }
   async function parseGPX(f) { const t=await f.text(); addImportedLayer(toGeoJSON.gpx(new DOMParser().parseFromString(t,'text/xml')), f.name); }
   async function parseKMZ(f) { const z=await JSZip.loadAsync(await f.arrayBuffer()); const k=Object.keys(z.files).find(f=>f.endsWith('.kml')); if(k){const t=await z.file(k).async('text'); addImportedLayer(toGeoJSON.kml(new DOMParser().parseFromString(t,'text/xml')), f.name);} }
   async function parseSHP(f) { addImportedLayer(await shp(await f.arrayBuffer()), f.name); }
   async function parseGPKG(f) { const arr=new Uint8Array(await f.arrayBuffer()); const gp=await geopackage.open(arr); const tables=gp.getFeatureTables(); const feats=[]; for(const t of tables){const d=gp.getFeatureDao(t); for(let i=0;i<d.count();i++){const ft=d.getFeature(i); const gj=d.getFeatureGeoJSON(ft.id); if(gj)feats.push(gj);}} gp.close(); addImportedLayer({type:"FeatureCollection",features:feats}, f.name); }
-  
-  async function parsePDF(f) {
-    const pdf=await pdfjsLib.getDocument({data:await f.arrayBuffer()}).promise;
-    const page=await pdf.getPage(1); const vp=page.getViewport({scale:1.5});
-    const c=document.createElement('canvas'); c.width=vp.width; c.height=vp.height;
-    await page.render({canvasContext:c.getContext('2d'),viewport:vp}).promise;
-    const imgDataUrl=c.toDataURL();
-    const bounds=map.getBounds();
-    
-    const item = { id:Date.now(), type:'import', subType:'pdf', name:f.name, desc:'PDF Overlay', createdAt:new Date().toLocaleString(),
-      data:{type:'import', subType:'pdf', imgDataUrl, bounds:{_southWest:{lat:bounds.getSouthWest().lat,lng:bounds.getSouthWest().lng},_northEast:{lat:bounds.getNorthEast().lat,lng:bounds.getNorthEast().lng}}, summary:'PDF Overlay'}
-    };
-    savedItems.push(item); createSavedLayer(item); persistData(); renderSheet(); showToast("PDF overlaid","info");
-  }
-
-  function addImportedLayer(geojson, name) {
-    if(!geojson.features||geojson.features.length===0){showToast('No features','warn');return;}
-    const item = { id:Date.now(), type:'import', subType:'vector', name, desc:`${geojson.features.length} features`, createdAt:new Date().toLocaleString(),
-      data:{type:'import', subType:'vector', geojson, summary:`${geojson.features.length} features`}
-    };
-    savedItems.push(item); createSavedLayer(item); persistData(); renderSheet(); map.fitBounds(savedLayers[item.id].getBounds()); showToast(`Imported ${name}`, "success");
-  }
+  async function parsePDF(f) { const pdf=await pdfjsLib.getDocument({data:await f.arrayBuffer()}).promise; const page=await pdf.getPage(1); const vp=page.getViewport({scale:1.5}); const c=document.createElement('canvas'); c.width=vp.width; c.height=vp.height; await page.render({canvasContext:c.getContext('2d'),viewport:vp}).promise; const imgDataUrl=c.toDataURL(); const bounds=map.getBounds(); const bnds = {_southWest:{lat:bounds.getSouthWest().lat,lng:bounds.getSouthWest().lng},_northEast:{lat:bounds.getNorthEast().lat,lng:bounds.getNorthEast().lng}}; const item = { id:Date.now(), type:'import', subType:'pdf', name:f.name, desc:'PDF Overlay', createdAt:new Date().toLocaleString(), data:{type:'import', subType:'pdf', imgDataUrl, bounds:bnds, summary:'PDF Overlay'} }; savedItems.push(item); createSavedLayer(item); persistData(); renderSheet(); showToast("PDF overlaid","info"); }
+  function addImportedLayer(geojson, name) { if(!geojson.features||geojson.features.length===0){showToast('No features','warn');return;} const item = { id:Date.now(), type:'import', subType:'vector', name, desc:`${geojson.features.length} features`, createdAt:new Date().toLocaleString(), data:{type:'import', subType:'vector', geojson, summary:`${geojson.features.length} features`} }; savedItems.push(item); createSavedLayer(item); persistData(); renderSheet(); map.fitBounds(savedLayers[item.id].getBounds()); showToast(`Imported ${name}`, "success"); }
 
   // ==================== EXPORT CSV ====================
-  function exportCSV() {
-    if(!savedItems.length){showToast('No items','warn');return;}
-    let csv="Type,Name,Description,Metrics,Created\n";
-    savedItems.forEach(i => {
-      let m=""; if(i.type==='point')m=`${i.data.latlng.lat.toFixed(6)},${i.data.latlng.lng.toFixed(6)}`;else if(i.type==='distance')m=`${i.data.distance.toFixed(2)}km`;else if(i.type==='area')m=formatArea(i.data.area);else if(i.type==='track')m=`${calcTotalDistance(i.data.points).toFixed(2)}km`;else m=i.data.summary||'';
-      csv+=`${i.type},"${i.name.replace(/"/g,'""')}","${(i.desc||'').replace(/"/g,'""')}","${m}",${i.createdAt}\n`;
-    });
-    const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'})); a.download='compass_export.csv'; a.click(); showToast("Exported","success"); closeDrawer();
-  }
+  function exportCSV() { if(!savedItems.length){showToast('No items','warn');return;} let csv="Type,Name,Description,Metrics,Created\n"; savedItems.forEach(i => { let m=""; if(i.type==='point')m=`${i.data.latlng.lat.toFixed(6)},${i.data.latlng.lng.toFixed(6)}`;else if(i.type==='distance')m=`${i.data.distance.toFixed(2)}km`;else if(i.type==='area')m=formatArea(i.data.area);else if(i.type==='track')m=`${calcTotalDistance(i.data.points).toFixed(2)}km`;else m=i.data.summary||''; csv+=`${i.type},"${i.name.replace(/"/g,'""')}","${(i.desc||'').replace(/"/g,'""')}","${m}",${i.createdAt}\n`; }); const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'})); a.download='compass_export.csv'; a.click(); showToast("Exported","success"); closeDrawer(); }
 
   // ==================== PANELS ====================
   function openDrawer() { document.getElementById('drawer').classList.add('open'); document.getElementById('drawerOverlay').classList.add('open'); }
   function closeDrawer() { document.getElementById('drawer').classList.remove('open'); document.getElementById('drawerOverlay').classList.remove('open'); }
   function openSheet() { document.getElementById('bottomSheet').classList.add('open'); document.getElementById('sheetOverlay').classList.add('open'); renderSheet(); }
   function closeSheet() { document.getElementById('bottomSheet').classList.remove('open'); document.getElementById('sheetOverlay').classList.remove('open'); }
-  
   function filterItems(f, btn) { currentFilter=f; document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active')); if(btn)btn.classList.add('active'); renderSheet(); }
 
-  function renderSheet() {
-    const body=document.getElementById('sheetBody');
-    let items = currentFilter==='all' ? savedItems : savedItems.filter(i=>i.type===currentFilter);
-    if(!items.length){body.innerHTML='<p style="text-align:center;color:var(--muted);padding:20px">No items.</p>';return;}
-    body.innerHTML = items.map(item => {
-      const ic={point:'fa-map-pin',distance:'fa-ruler',area:'fa-draw-polygon',track:'fa-route',import:'fa-file-import'};
-      let m=''; if(item.type==='point')m=`${item.data.latlng.lat.toFixed(4)}, ${item.data.latlng.lng.toFixed(4)}`;else if(item.type==='distance')m=`${item.data.distance.toFixed(2)} km`;else if(item.type==='area')m=formatArea(item.data.area);else if(item.type==='track')m=`${calcTotalDistance(item.data.points).toFixed(2)} km`;else m=item.data.summary||'';
-      return `<div class="saved-item"><div class="item-header"><div class="item-icon ${item.type}"><i class="fas ${ic[item.type]}"></i></div><span class="item-name">${item.name}</span><div class="item-actions"><button onclick="zoomToItem('${item.id}')"><i class="fas fa-crosshairs"></i></button><button onclick="editItem('${item.id}')"><i class="fas fa-pen"></i></button><button class="del" onclick="deleteItem('${item.id}')"><i class="fas fa-trash"></i></button></div></div>${item.desc?`<div class="item-desc">${item.desc}</div>`:''}<div class="item-meta"><span>${m}</span></div></div>`;
-    }).join('');
-  }
+  function renderSheet() { const body=document.getElementById('sheetBody'); let items = currentFilter==='all' ? savedItems : savedItems.filter(i=>i.type===currentFilter); if(!items.length){body.innerHTML='<p style="text-align:center;color:var(--muted);padding:20px">No items.</p>';return;} body.innerHTML = items.map(item => { const ic={point:'fa-map-pin',distance:'fa-ruler',area:'fa-draw-polygon',track:'fa-route',import:'fa-file-import'}; let m=''; if(item.type==='point')m=`${item.data.latlng.lat.toFixed(4)}, ${item.data.latlng.lng.toFixed(4)}`;else if(item.type==='distance')m=`${item.data.distance.toFixed(2)} km`;else if(item.type==='area')m=formatArea(item.data.area);else if(item.type==='track')m=`${calcTotalDistance(item.data.points).toFixed(2)} km`;else m=item.data.summary||''; return `<div class="saved-item"><div class="item-header"><div class="item-icon ${item.type}"><i class="fas ${ic[item.type]}"></i></div><span class="item-name">${item.name}</span><div class="item-actions"><button onclick="zoomToItem('${item.id}')"><i class="fas fa-crosshairs"></i></button><button onclick="editItem('${item.id}')"><i class="fas fa-pen"></i></button><button class="del" onclick="deleteItem('${item.id}')"><i class="fas fa-trash"></i></button></div></div>${item.desc?`<div class="item-desc">${item.desc}</div>`:''}<div class="item-meta"><span>${m}</span></div></div>`; }).join(''); }
 
   function zoomToItem(id) { const i=savedItems.find(x=>String(x.id)===String(id)); if(!i)return; if(i.type==='point')map.setView([i.data.latlng.lat,i.data.latlng.lng],16); else if(i.type==='import'&&savedLayers[i.id]&&savedLayers[i.id].getBounds)map.fitBounds(savedLayers[i.id].getBounds()); else if(i.data.points)map.fitBounds(L.latLngBounds(i.data.points.map(p=>[p.lat,p.lng]))); }
-  
   function deleteItem(id) { const i=savedItems.find(x=>String(x.id)===String(id)); if(!i)return; if(savedLayers[i.id]){map.removeLayer(savedLayers[i.id]);delete savedLayers[i.id];} savedItems=savedItems.filter(x=>String(x.id)!==String(id)); persistData(); renderSheet(); showToast("Deleted","info"); }
-  
   function editItem(id) { const i=savedItems.find(x=>String(x.id)===String(id)); if(!i)return; pendingSaveData={...i.data,isEdit:true,editId:i.id}; openSaveModal('Edit',i.name,getItemSummary(i)); document.getElementById('itemName').value=i.name; document.getElementById('itemDesc').value=i.desc||''; }
   function getItemSummary(i){if(i.type==='point')return`${i.data.latlng.lat.toFixed(6)},${i.data.latlng.lng.toFixed(6)}`;if(i.type==='distance')return`${i.data.distance.toFixed(2)}km`;if(i.type==='area')return formatArea(i.data.area);if(i.type==='track')return`${calcTotalDistance(i.data.points).toFixed(2)}km`;return i.data.summary||'';}
 
@@ -537,8 +311,6 @@
 
   // ==================== INIT ====================
   loadData(); // Load from LocalStorage on startup
-  
-  // Register Service Worker
   if('serviceWorker' in navigator) { navigator.serviceWorker.register('sw.js').catch(e => console.log("SW Error", e)); }
 </script>
 </body>
