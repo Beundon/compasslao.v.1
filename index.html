@@ -46,18 +46,19 @@
   .search-item .res-name { font-weight:600; display:block; margin-bottom:2px; }
   .search-item .res-type { font-size:0.75rem; color:var(--muted); text-transform:capitalize; }
 
-  #map { position:fixed; top:50px; left:0; right:0; bottom:60px; z-index:1; background:var(--bg); }
+  #map { position:fixed; top:50px; left:0; right:0; bottom:56px; z-index:1; background:var(--bg); }
   .leaflet-control-zoom { display:none; }
   body.light-mode .leaflet-popup-content-wrapper { background:var(--card); color:var(--fg); }
   body.light-mode .leaflet-popup-tip { background:var(--card); }
 
-  .bottom-nav { position:fixed; bottom:0; left:0; right:0; height:60px; z-index:1000; background:var(--bg2); border-top:1px solid var(--border); display:flex; align-items:center; justify-content:space-around; padding-bottom:var(--safe-bottom); transition: background 0.3s; }
-  .nav-btn { display:flex; flex-direction:column; align-items:center; justify-content:center; background:none; border:none; color:var(--muted); cursor:pointer; padding:8px 12px; font-family:'Outfit',sans-serif; font-size:0.65rem; font-weight:600; gap:4px; transition:0.2s; }
-  .nav-btn i { font-size:1.2rem; }
+  /* Optimized Bottom Nav for 6 items */
+  .bottom-nav { position:fixed; bottom:0; left:0; right:0; height:56px; z-index:1000; background:var(--bg2); border-top:1px solid var(--border); display:flex; align-items:center; justify-content:space-around; padding-bottom:var(--safe-bottom); transition: background 0.3s; }
+  .nav-btn { display:flex; flex-direction:column; align-items:center; justify-content:center; background:none; border:none; color:var(--muted); cursor:pointer; padding:4px 6px; font-family:'Outfit',sans-serif; font-size:0.6rem; font-weight:600; gap:2px; transition:0.2s; flex:1; max-width:80px; }
+  .nav-btn i { font-size:1.1rem; }
   .nav-btn.active { color:var(--accent); }
-  .nav-btn.locate-btn i { font-size:1.5rem; color:var(--locate); }
+  .nav-btn.locate-btn i { font-size:1.3rem; color:var(--locate); }
   
-  .fab { position:fixed; bottom:80px; right:16px; z-index:900; width:56px; height:56px; border-radius:50%; background:var(--accent); color:var(--bg); border:none; font-size:1.4rem; cursor:pointer; box-shadow:0 4px 12px rgba(0,0,0,0.4); display:none; align-items:center; justify-content:center; transition:0.2s; }
+  .fab { position:fixed; bottom:76px; right:16px; z-index:900; width:56px; height:56px; border-radius:50%; background:var(--accent); color:var(--bg); border:none; font-size:1.4rem; cursor:pointer; box-shadow:0 4px 12px rgba(0,0,0,0.4); display:none; align-items:center; justify-content:center; transition:0.2s; }
   .fab:active { transform:scale(0.9); }
 
   .drawer-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:1500; display:none; }
@@ -165,6 +166,7 @@
   <button class="nav-btn" onclick="openDrawer()"><i class="fas fa-bars"></i><span>Menu</span></button>
   <button class="nav-btn" data-tool="point" onclick="setTool('point')"><i class="fas fa-map-pin"></i><span>Point</span></button>
   <button class="nav-btn locate-btn" onclick="toggleLocate()"><i class="fas fa-location-crosshairs"></i></button>
+  <button class="nav-btn" data-tool="distance" onclick="setTool('distance')"><i class="fas fa-ruler"></i><span>Dist</span></button>
   <button class="nav-btn" data-tool="area" onclick="setTool('area')"><i class="fas fa-draw-polygon"></i><span>Area</span></button>
   <button class="nav-btn" onclick="openSheet()"><i class="fas fa-layer-group"></i><span>Layers</span></button>
 </div>
@@ -174,7 +176,6 @@
 <div class="drawer" id="drawer">
   <div class="drawer-header"><h2>Menu</h2><button onclick="closeDrawer()" style="background:none;border:none;color:var(--fg);font-size:1.2rem;cursor:pointer"><i class="fas fa-xmark"></i></button></div>
   <div class="drawer-body">
-    <!-- UI Theme -->
     <button class="drawer-btn" onclick="toggleTheme()"><i class="fas fa-circle-half-stroke"></i> <span id="themeLabel">Switch to Light Mode</span></button>
     
     <div style="padding:8px 0 4px; font-size:0.8rem; font-weight:600; color:var(--muted);">MAP STYLE</div>
@@ -186,9 +187,7 @@
     </div>
 
     <div style="height:1px;background:var(--border);margin:12px 0"></div>
-    <button class="drawer-btn" onclick="setTool('distance')"><i class="fas fa-ruler"></i> Measure Distance</button>
     <button class="drawer-btn" onclick="setTool('track')"><i class="fas fa-route"></i> Record Track</button>
-    <div style="height:1px;background:var(--border);margin:12px 0"></div>
     <button class="drawer-btn" onclick="document.getElementById('fileInput').click()"><i class="fas fa-file-import"></i> Import File</button>
     <button class="drawer-btn" onclick="exportCSV()"><i class="fas fa-file-csv"></i> Export CSV</button>
     <div style="height:1px;background:var(--border);margin:12px 0"></div>
@@ -247,14 +246,14 @@
   async function ensureLibs(...names) { const promises = names.map(name => loadScript(LIBS[name])); await Promise.all(promises); if (names.includes('pdfjs') && window.pdfjsLib) { pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.worker.min.js'; } }
 
   // ==================== MAP INIT & BASEMAPS ====================
-  map = L.map('map', { center: [13.7563, 100.5018], zoom: 13, zoomControl: false });
+  // DEFAULT MAP CENTERED ON LAOS [Lat, Lng], Zoom 6 to show the whole country
+  map = L.map('map', { center: [19.5, 103.0], zoom: 6, zoomControl: false });
   
   baseLayerGroup.sat = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution: '© Esri', maxZoom: 19 });
   baseLayerGroup.topo = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', { attribution: '© OpenTopoMap', maxZoom: 17 });
   baseLayerGroup.street = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', { attribution: '© CARTO', maxZoom: 19 });
   baseLayerGroup.dark = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { attribution: '© CARTO', maxZoom: 19 });
 
-  // Default layer
   baseLayerGroup.sat.addTo(map);
   setTimeout(() => { map.invalidateSize(); }, 200);
 
@@ -303,17 +302,8 @@
   });
 
   // ==================== THEME TOGGLE ====================
-  function initTheme() {
-    const isLight = localStorage.getItem('compassTheme') === 'light';
-    if (isLight) { document.body.classList.add('light-mode'); document.getElementById('themeLabel').textContent = 'Switch to Dark Mode'; }
-    else { document.getElementById('themeLabel').textContent = 'Switch to Light Mode'; }
-  }
-  function toggleTheme() {
-    document.body.classList.toggle('light-mode');
-    const isLight = document.body.classList.contains('light-mode');
-    localStorage.setItem('compassTheme', isLight ? 'light' : 'dark');
-    document.getElementById('themeLabel').textContent = isLight ? 'Switch to Dark Mode' : 'Switch to Light Mode';
-  }
+  function initTheme() { const isLight = localStorage.getItem('compassTheme') === 'light'; if (isLight) { document.body.classList.add('light-mode'); document.getElementById('themeLabel').textContent = 'Switch to Dark Mode'; } else { document.getElementById('themeLabel').textContent = 'Switch to Light Mode'; } }
+  function toggleTheme() { document.body.classList.toggle('light-mode'); const isLight = document.body.classList.contains('light-mode'); localStorage.setItem('compassTheme', isLight ? 'light' : 'dark'); document.getElementById('themeLabel').textContent = isLight ? 'Switch to Dark Mode' : 'Switch to Light Mode'; }
 
   // ==================== LOCAL STORAGE ====================
   function persistData() { try { const s = savedItems.map(i => { const c = {...i, data: {...i.data}}; if (c.data.layer) delete c.data.layer; return c; }); localStorage.setItem('compassData', JSON.stringify(s)); } catch (e) { showToast("Storage full", "warn"); } }
