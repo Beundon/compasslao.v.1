@@ -1,21 +1,35 @@
-const CACHE_NAME = 'compass-cache-v1';
+const CACHE_NAME = 'compass-cache-v2';
 const urlsToCache = [
-  '/', '/index.html',
+  '/', 
+  '/index.html',
   'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',
   'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js',
   'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css',
-  'https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap',
-  'https://unpkg.com/@tmcw/togeojson@5.6.0/dist/togeojson.umd.js',
-  'https://unpkg.com/jszip@3.10.1/dist/jszip.min.js',
-  'https://unpkg.com/shpjs@4.0.4/dist/shp.js',
-  'https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.min.js',
-  'https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.worker.min.js'
+  'https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=JetBrains+Mono:wght@400&display=swap'
 ];
 
 self.addEventListener('install', event => {
-  event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(urlsToCache)));
+  // Only cache lightweight core files on install for fast startup
+  event.waitUntil(
+    caches.open(CACHE_NAME).then(cache => cache.addAll(urlsToCache))
+  );
 });
 
 self.addEventListener('fetch', event => {
-  event.respondWith(caches.match(event.request).then(response => response || fetch(event.request)));
+  // Network first, fallback to cache for dynamic library loads
+  event.respondWith(
+    fetch(event.request).then(response => {
+      // If it's a valid response, clone it and put it in the cache
+      if (response && response.status === 200) {
+        const responseToCache = response.clone();
+        caches.open(CACHE_NAME).then(cache => {
+          cache.put(event.request, responseToCache);
+        });
+      }
+      return response;
+    }).catch(() => {
+      // If offline, try to serve from cache
+      return caches.match(event.request);
+    })
+  );
 });
